@@ -109,12 +109,6 @@ jobs:
 
         repo init -u https://android.googlesource.com/kernel/manifest -b ${FORMATTED_BRANCH} --repo-rev=v2.16 --depth=1
 
-        REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
-        DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-        if grep -q deprecated <<< $REMOTE_BRANCH; then
-          sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
-        fi
-
         repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle
 
     - name: Extract Sublevel and Set File Name
@@ -162,7 +156,7 @@ jobs:
 
     - name: Clone & Apply SUSFS Patches
       run: |
-        SUSFS_BRANCH="gki-${{ inputs.version }}"
+        SUSFS_BRANCH="gki"
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
         SUSFS_VERSION="2.0.0"
