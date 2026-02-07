@@ -19,8 +19,8 @@ on:
         required: false
 
 jobs:
-  build-pixel:
-    uses: ./.github/workflows/pixel.yml
+  build-kernel:
+    uses: ./.github/workflows/kernel.yml
     secrets: inherit
     with:
       ksu_commit: ${{ inputs.ksu_commit }}
@@ -29,7 +29,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     needs:
-    - build-pixel
+    - build-kernel
     steps:
     - name: Download Misc Artifacts
       uses: actions/download-artifact@v5
@@ -87,7 +87,7 @@ jobs:
     permissions:
       contents: write
     needs:
-    - build-pixel
+    - build-kernel
 
     env:
       GH_TOKEN: ${{ github.token }}
