@@ -17,134 +17,19 @@ on:
         type: string
         default: ""
         required: false
-      build_bypass:
-        description: "Build Bypass"
-        type: boolean
-        default: false
-      # Build Selection
-      build_a12_5_10:
-        description: "Android 12 - 5.10"
-        type: boolean
-        default: false
-      build_a13_5_10:
-        description: "Android 13 - 5.10"
-        type: boolean
-        default: false
-      build_a13_5_15:
-        description: "Android 13 - 5.15"
-        type: boolean
-        default: false
-      build_a14_5_15:
-        description: "Android 14 - 5.15"
-        type: boolean
-        default: false
-      build_a14_6_1:
-        description: "Android 14 - 6.1"
-        type: boolean
-        default: false
-      build_a15_6_6:
-        description: "Android 15 - 6.6"
-        type: boolean
-        default: false
-      build_a16_6_12:
-        description: "Android 16 - 6.12"
-        type: boolean
-        default: false
-      build_custom:
-        description: "Custom Builds"
-        type: boolean
-        default: true
-      build_lts:
-        description: "Build All LTS Kernels"
-        type: boolean
-        default: false
 
 jobs:
-  build-a12-5-10:
-    if: inputs.build_a12_5_10
-    uses: ./.github/workflows/kernel-a12-5-10.yml
+  build-pixel:
+    uses: ./.github/workflows/kernel-pixel.yml
     secrets: inherit
     with:
       ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-a13-5-10:
-    if: inputs.build_a13_5_10
-    uses: ./.github/workflows/kernel-a13-5-10.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-a13-5-15:
-    if: inputs.build_a13_5_15
-    uses: ./.github/workflows/kernel-a13-5-15.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-a14-5-15:
-    if: inputs.build_a14_5_15
-    uses: ./.github/workflows/kernel-a14-5-15.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-a14-6-1:
-    if: inputs.build_a14_6_1
-    uses: ./.github/workflows/kernel-a14-6-1.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-a15-6-6:
-    if: inputs.build_a15_6_6
-    uses: ./.github/workflows/kernel-a15-6-6.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-a16-6-12:
-    if: inputs.build_a16_6_12
-    uses: ./.github/workflows/kernel-a16-612.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-custom:
-    if: inputs.build_custom
-    uses: ./.github/workflows/kernel-custom.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
-
-  build-lts:
-    if: inputs.build_lts
-    uses: ./.github/workflows/kernel-lts.yml
-    secrets: inherit
-    with:
-      ksu_commit: ${{ inputs.ksu_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
 
   rej:
     if: always()
     runs-on: ubuntu-latest
     needs:
-    - build-a12-5-10
-    - build-a13-5-10
-    - build-a13-5-15
-    - build-a14-5-15
-    - build-a14-6-1
-    - build-a15-6-6
-    - build-a16-6-12
-    - build-custom
-    - build-lts
+    - build-pixel
     steps:
     - name: Download Misc Artifacts
       uses: actions/download-artifact@v5
@@ -202,15 +87,7 @@ jobs:
     permissions:
       contents: write
     needs:
-    - build-a12-5-10
-    - build-a13-5-10
-    - build-a13-5-15
-    - build-a14-5-15
-    - build-a14-6-1
-    - build-a15-6-6
-    - build-a16-6-12
-    - build-custom
-    - build-lts
+    - build-pixel
 
     env:
       GH_TOKEN: ${{ github.token }}
