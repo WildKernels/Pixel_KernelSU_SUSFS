@@ -1,0 +1,60 @@
+name: Pixel Kernel Config
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_call:
+    inputs:
+      ksu_commit:
+        required: false
+        type: string
+
+jobs:
+  build-kernel-custom:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - device: "6 / 6 Pro"
+          codename: "raviole"
+          version: "android14-6.1"
+        - device: "6a"
+          codename: "bluejay"
+          version: "android14-6.1"
+        - device: "7 / 7 Pro"
+          codename: "pantah"
+          version: "android14-6.1"
+        - device: "7a"
+          codename: "lynx"
+          version: "android14-6.1"
+        - device: "Tablet"
+          codename: "tangorpro"
+          version: "android14-6.1"
+        - device: "Fold"
+          codename: "felix"
+          version: "android14-6.1"
+        - device: "8 / 8 Pro"
+          codename: "shusky"
+          version: "android14-6.1"
+        - device: "8a"
+          codename: "akita"
+          version: "android14-6.1"
+        - device: "9 / 9 Pro / 9 Pro XL"
+          codename: "caimito"
+          version: "android14-6.1"
+        - device: "9 Pro Fold"
+          codename: "comet"
+          version: "android14-6.1"
+        - device: "9a"
+          codename: "tegu"
+          version: "android14-6.1"
+
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      device: ${{ matrix.device }}
+      codename: ${{ matrix.codename }}
+      version: ${{ matrix.version }}
+      ksu_commit: ${{ inputs.ksu_commit }}
