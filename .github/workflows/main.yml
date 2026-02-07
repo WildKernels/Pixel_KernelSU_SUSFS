@@ -20,7 +20,7 @@ on:
 
 jobs:
   build-pixel:
-    uses: ./.github/workflows/kernel-pixel.yml
+    uses: ./.github/workflows/pixel.yml
     secrets: inherit
     with:
       ksu_commit: ${{ inputs.ksu_commit }}
