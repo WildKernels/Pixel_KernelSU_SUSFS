@@ -10,6 +10,7 @@ on:
       ksu_commit:
         required: false
         type: string
+  push:
 
 jobs:
   build-kernel-custom:
