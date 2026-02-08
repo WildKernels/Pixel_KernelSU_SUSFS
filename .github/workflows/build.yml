@@ -21,7 +21,7 @@ on:
 
 jobs:
   build-gki:
-    name: "${{ inputs.device }} - ${{ inputs.codename }} - ${{ inputs.version }}"
+    name: "${{ inputs.codename }}"
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -63,16 +63,6 @@ jobs:
           binutils-x86-64-linux-gnu \
           lld
 
-        if ! command -v ld >/dev/null 2>&1 && command -v x86_64-linux-gnu-ld >/dev/null 2>&1; then
-          sudo ln -sf "$(command -v x86_64-linux-gnu-ld)" /usr/bin/ld
-        fi
-
-        command -v ld
-        ld --version | head -n 1
-        echo "PATH=/usr/bin:/bin:$PATH" >> "$GITHUB_ENV"
-        echo "HOSTLDFLAGS=-B/usr/bin ${HOSTLDFLAGS:-}" >> "$GITHUB_ENV"
-        echo "LDFLAGS=-B/usr/bin ${LDFLAGS:-}" >> "$GITHUB_ENV"
-
     - name: Setup Build Environment
       run: |
         CONFIG="android-gs-${{ inputs.codename }}-${{ inputs.version }}"
@@ -107,9 +97,11 @@ jobs:
       run: |
         FORMATTED_BRANCH="android-gs-${{ inputs.codename }}-${{ inputs.version }}"
 
-        repo init -u https://android.googlesource.com/kernel/manifest -b ${FORMATTED_BRANCH} --depth=1
+        repo init -u https://android.googlesource.com/kernel/manifest -b ${FORMATTED_BRANCH}
 
-        repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --no-clone-bundle
+        repo sync -c -j$(nproc --all) --no-tags
+
+        #--trace --no-clone-bundle --fail-fast        --depth=1
 
     - name: Extract Sublevel and Set File Name
       run: |
@@ -248,7 +240,7 @@ jobs:
         fi
 
     - name: Add BBG
-      if: true
+      if: false
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
         curl -LSs https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
@@ -278,176 +270,10 @@ jobs:
         CONFIG_TMPFS_XATTR=y
         CONFIG_TMPFS_POSIX_ACL=y
         
-        # Networking Configuration
-        #CONFIG_IP_NF_TARGET_TTL=y
-        #CONFIG_IP6_NF_TARGET_HL=y
-        #CONFIG_IP6_NF_MATCH_HL=y
-        
-        # BBR TCP Congestion Control
-        #CONFIG_TCP_CONG_ADVANCED=y
-        #CONFIG_TCP_CONG_BBR=y
-        #CONFIG_NET_SCH_FQ=y
-        ## CONFIG_TCP_CONG_BIC is not set
-        ## CONFIG_TCP_CONG_WESTWOOD is not set
-        ## CONFIG_TCP_CONG_HTCP is not set
-        
-        # IPSet Support
-        #CONFIG_IP_SET=y
-        #CONFIG_IP_SET_MAX=65534
-        #CONFIG_IP_SET_BITMAP_IP=y
-        #CONFIG_IP_SET_BITMAP_IPMAC=y
-        #CONFIG_IP_SET_BITMAP_PORT=y
-        #CONFIG_IP_SET_HASH_IP=y
-        #CONFIG_IP_SET_HASH_IPMARK=y
-        #CONFIG_IP_SET_HASH_IPPORT=y
-        #CONFIG_IP_SET_HASH_IPPORTIP=y
-        #CONFIG_IP_SET_HASH_IPPORTNET=y
-        #CONFIG_IP_SET_HASH_IPMAC=y
-        #CONFIG_IP_SET_HASH_MAC=y
-        #CONFIG_IP_SET_HASH_NETPORTNET=y
-        #CONFIG_IP_SET_HASH_NET=y
-        #CONFIG_IP_SET_HASH_NETNET=y
-        #CONFIG_IP_SET_HASH_NETPORT=y
-        #CONFIG_IP_SET_HASH_NETIFACE=y
-        #CONFIG_IP_SET_LIST_SET=y
-        
         EOF
 
         echo "Contents of ${{ env.DEFCONFIG_FRAGMENT }}:"
         cat "${{ env.DEFCONFIG_FRAGMENT }}"
-
-    - name: Configure Audio Modules
-      if: inputs.variant == 'Hakan'
-      working-directory: ${{ env.KERNEL_ROOT }}
-      run: |
-        cat >> "${{ env.DEFCONFIG_FRAGMENT }}" << 'EOF'
-        CONFIG_RFKILL=y
-        CONFIG_CFG80211=y
-        CONFIG_MAC80211=y
-        EOF
-
-        sed -i \
-          -e '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*"lib\/crypto\/libarc4\.ko",[[:space:]]*$/d}' \
-          -e '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*"net\/rfkill\/rfkill\.ko",[[:space:]]*$/d}' \
-          common/modules.bzl
-
-    - name: Configure SND
-      if: inputs.variant == 'vTomsonek'
-      working-directory: ${{ env.KERNEL_ROOT }}
-      run: |
-        cat >> "${{ env.DEFCONFIG_FRAGMENT }}" << 'EOF'
-        # Sound Configuration
-        CONFIG_SND=y
-        CONFIG_SND_DRIVERS=y
-        CONFIG_SND_PCM=y
-        CONFIG_SND_TIMER=y
-        CONFIG_SND_DYNAMIC_MINORS=y
-        CONFIG_SND_PROC_FS=y
-        CONFIG_SND_ALOOP=m
-        CONFIG_USB_GADGET=y
-        CONFIG_CONFIGFS_FS=y
-        CONFIG_USB_CONFIGFS=y
-        CONFIG_USB_LIBCOMPOSITE=m
-        CONFIG_USB_AUDIO=m
-        CONFIG_USB_CONFIGFS_F_UAC1=y
-        CONFIG_USB_CONFIGFS_F_UAC2=y
-        EOF
-
-        # Add snd-aloop.ko to modules list
-        echo "drivers/usb/gadget/legacy/g_audio.ko" >> common/android/gki_aarch64_modules
-        echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
-        #echo "drivers/usb/gadget/libcomposite.ko" >> common/android/gki_aarch64_modules
-
-        if [[ -f common/modules.bzl ]]; then
-          # Insert before the closing bracket of COMMON_GKI_MODULES_LIST or _COMMON_GKI_MODULES_LIST
-          echo "Audio modules injection: adding to module list"
-          if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" && $SUBLEVEL -le 110 && "${{ inputs.os_patch_level }}" != "2023-09" ]] \
-          || [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" && $SUBLEVEL -le 25 && "${{ inputs.os_patch_level }}" != "2023-09" ]]; then
-            # snd-aloop
-            sed -i '/COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "sound/drivers/snd-aloop.ko",
-            }' common/modules.bzl
-            # USB Gadget Audio modules
-            sed -i '/COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/libcomposite.ko",
-            }' common/modules.bzl
-            sed -i '/COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/legacy/g_audio.ko",
-            }' common/modules.bzl
-          else
-            # snd-aloop
-            sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "sound/drivers/snd-aloop.ko",
-            }' common/modules.bzl
-            # USB Gadget Audio modules
-            sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/libcomposite.ko",
-            }' common/modules.bzl
-            sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/legacy/g_audio.ko",
-            }' common/modules.bzl
-          fi
-          
-          # Verify the injection was successful
-          if grep -q '"sound/drivers/snd-aloop.ko"' common/modules.bzl && \
-            grep -q '"drivers/usb/gadget/libcomposite.ko"' common/modules.bzl && \
-            grep -q '"drivers/usb/gadget/legacy/g_audio.ko"' common/modules.bzl && \
-            grep -q '"drivers/usb/gadget/configfs.ko"' common/modules.bzl; then
-            echo "✓ Audio modules injection: successfully added all modules to list"
-          else
-            echo "✗ Audio modules injection: failed to add one or more modules"
-            exit 1
-          fi
-        fi
-
-        # Add symbols to abi_gki_aarch64
-        #SYMBOL_LIST=common/android/abi_gki_aarch64
-        #cat Wild_KSU/kernel/export_symbol.txt | awk '{sub("[ \t]+","");print "  "$0}' >> $SYMBOL_LIST
-
-        # ABI compare bypass per kernel/android version
-        # Edit each block as needed per version
-        if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
-          sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/abi/compare_to_symbol_list
-        elif [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
-          sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/kernel/abi/compare_to_symbol_list
-        elif [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
-          sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/kernel/abi/compare_to_symbol_list
-        elif [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
-          perl -i -pe 's/^(\s*)return 1$/$1print("Who Cares? Bypassing Now!")\n$1return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
-        elif [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
-          perl -i -pe 's/^(\s*)return 1$/$1print("Who Cares? Bypassing Now!")\n$1return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
-        elif [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
-          perl -i -pe 's/^(\s*)return 1$/$1print("Who Cares? Bypassing Now!")\n$1return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
-        fi
-
-    - name: Append ashmem exports if missing
-      if: ${{ inputs.android_version == 'android16' && inputs.kernel_version == '6.12' && false }}
-      working-directory: ${{ env.KERNEL_ROOT }}
-      run: |
-        FILE=common/drivers/staging/android/ashmem.c
-        if [[ -f "$FILE" ]] && ! grep -q 'is_ashmem_file' "$FILE"; then
-        cat >>"$FILE" <<'EOF'
-        bool is_ashmem_file(struct file *file) { return false; }
-        int ashmem_area_name(struct file *file, char *name) { return 0; }
-        long ashmem_area_size(struct file *file) { return 0; }
-        struct file *ashmem_area_vmfile(struct file *file) { return NULL; }
-        EXPORT_SYMBOL_GPL(is_ashmem_file);
-        EXPORT_SYMBOL_GPL(ashmem_area_name);
-        EXPORT_SYMBOL_GPL(ashmem_area_size);
-        EXPORT_SYMBOL_GPL(ashmem_area_vmfile);
-        EOF
-        fi
-
-        if [ -f common/drivers/android/binder/Makefile ]; then
-          perl -i -0777 -pe 's/\$\(\s*CONFIG_ANDROID_BINDER_IPC_RUST\s*\)/m/' common/drivers/android/binder/Makefile
-          #perl -i -ne 'print unless /CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY/' common/drivers/android/binder/Makefile
-          perl -i -pe 's/^rust_binder-\$\([^)]+\)\s*:=/rust_binder-y :=/' common/drivers/android/binder/Makefile
-          cat common/drivers/android/Makefile
-          cat common/drivers/android/binder/Makefile
-          #perl -ni -e 'print unless /rust_toolchain\s*=\s*"\/\/build\/rust:linux_kernel_toolchain",/' common/BUILD.bazel
-          #cat common/BUILD.bazel
-          rustup set profile minimal
-          rustup update nightly
-          rustup default nightly
-          rustup target add aarch64-unknown-none
-        else
-          perl -i -0777 -pe 's/\$\(\s*CONFIG_ANDROID_BINDER_IPC_RUST\s*\)/m/' common/drivers/android/Makefile
-          cat common/drivers/android/Makefile
-        fi
 
     - name: Change Kernel Name
       working-directory: ${{ env.KERNEL_ROOT }}
