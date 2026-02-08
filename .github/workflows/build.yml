@@ -97,11 +97,11 @@ jobs:
       run: |
         FORMATTED_BRANCH="android-gs-${{ inputs.codename }}-${{ inputs.version }}"
 
-        repo init -u https://android.googlesource.com/kernel/manifest -b ${FORMATTED_BRANCH}
+        repo init -u https://android.googlesource.com/kernel/manifest -b ${FORMATTED_BRANCH} --depth=1
 
         repo sync -c -j$(nproc --all) --no-tags
 
-        #--trace --no-clone-bundle --fail-fast        --depth=1
+        #--trace --no-clone-bundle --fail-fast
 
     - name: Extract Sublevel and Set File Name
       run: |
