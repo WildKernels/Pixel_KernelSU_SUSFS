@@ -1,0 +1,112 @@
+name: 'Telegram Notification'
+description: 'Send Telegram notifications for kernel builds'
+inputs:
+  release_type:
+    description: 'Type of release (Actions, Pre-Release, Release)'
+    required: true
+  new_tag:
+    description: 'New release tag'
+    required: false
+    default: ''
+  release_result:
+    description: 'Result of the release job'
+    required: false
+    default: 'success'
+  telegram_bot_token:
+    description: 'Telegram bot token'
+    required: true
+  telegram_chat_id:
+    description: 'Telegram chat ID for announcements'
+    required: true
+  telegram_topic_id:
+    description: 'Telegram topic/thread ID'
+    required: true
+  telegram_user_id:
+    description: 'Telegram user ID for direct messages'
+    required: true
+  artifact_pattern:
+    description: 'Pattern for artifacts to download'
+    required: false
+    default: '*-TheWildJames-AnyKernel3'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download Kernel Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./downloaded-artifacts
+        pattern: ${{ inputs.artifact_pattern }}
+        
+    - name: Prepare Artifact Zips
+      shell: bash
+      run: |
+        shopt -s nullglob
+        # Iterate over directories in downloaded-artifacts
+        for dir in ./downloaded-artifacts/*-AnyKernel3; do
+          [ -d "$dir" ] || continue
+          artifact_name=$(basename "$dir")
+          # Create zip for each artifact
+          (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*)
+        done
+
+    - name: Send Telegram Notification (Actions)
+      if: ${{ inputs.release_type == 'Actions' }}
+      shell: bash
+      run: |
+        curl -X POST "https://api.telegram.org/bot${{ inputs.telegram_bot_token }}/sendMessage" \
+          -F chat_id="${{ inputs.telegram_chat_id }}" \
+          -F message_thread_id="${{ inputs.telegram_topic_id }}" \
+          -F text="
+          🌽 *New Kernel Actions Build Finished*
+          📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})
+          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+          [🔗 View Action Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+          -F parse_mode="Markdown"
+
+    - name: Send Telegram Notification (Release)
+      if: ${{ inputs.release_type != 'Actions' && inputs.release_result == 'success' }}
+      shell: bash
+      run: |
+        RELEASE_TYPE_TEXT=""
+        if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
+          RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
+        else
+          RELEASE_TYPE_TEXT="🚀 *Release*"
+        fi
+
+        curl -X POST "https://api.telegram.org/bot${{ inputs.telegram_bot_token }}/sendMessage" \
+          -F chat_id="${{ inputs.telegram_chat_id }}" \
+          -F message_thread_id="${{ inputs.telegram_topic_id }}" \
+          -F text="
+          🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
+          📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
+          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+          [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ inputs.new_tag }})" \
+          -F parse_mode="Markdown"
+
+    - name: Send Direct Message with Artifacts
+      if: always()
+      shell: bash
+      run: |
+        shopt -s nullglob
+        files=("$GITHUB_WORKSPACE"/*.zip)
+
+        if [ ${#files[@]} -eq 0 ]; then
+            echo "No ZIP files found for DM."
+            exit 0
+        fi
+
+        if [ -z "${{ inputs.telegram_user_id }}" ]; then
+            echo "Error: telegram_user_id is not set."
+            exit 1
+        fi
+
+        for file in "${files[@]}"; do
+          # Send each zip to Telegram DM
+          # Using || true to prevent failure of one send from failing the whole action
+          curl -v -F chat_id="${{ inputs.telegram_user_id }}" \
+              -F document=@"$file" \
+              -F caption="📦 Build: $(basename "$file")" \
+              https://api.telegram.org/bot${{ inputs.telegram_bot_token }}/sendDocument || true
+        done

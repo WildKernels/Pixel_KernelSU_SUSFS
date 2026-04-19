@@ -1,0 +1,77 @@
+name: Prepare and Build
+
+on:
+  workflow_call:
+    inputs:
+      config_file:
+        description: "Path to the JSON config file"
+        required: true
+        type: string
+      ksu_commit:
+        description: "KSU Commit"
+        required: false
+        type: string
+      anykernel_commit:
+        description: "AnyKernel3 Commit"
+        required: false
+        type: string
+      patches_commit:
+        description: "Kernel Patches Commit"
+        required: false
+        type: string
+      susfs_commit:
+        description: "SUSFS Commit"
+        required: false
+        type: string
+      feature_set:
+        description: "Feature Set"
+        required: false
+        type: string
+
+jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Read Config and Generate Matrix
+        id: set-matrix
+        run: |
+          echo "Reading config from ${{ inputs.config_file }}"
+          if [ ! -f "${{ inputs.config_file }}" ]; then
+            echo "Error: Config file not found: ${{ inputs.config_file }}"
+            exit 1
+          fi
+          
+          # Read the file content
+          MATRIX_JSON=$(cat "${{ inputs.config_file }}")
+          
+          # Compact the JSON to a single line to avoid issues
+          # If jq is not available, we might need another way, but ubuntu-latest usually has it.
+          if command -v jq &> /dev/null; then
+            MATRIX_JSON=$(echo "$MATRIX_JSON" | jq -c .)
+          else
+            # Fallback for simple minification if jq missing (unlikely on runner)
+            MATRIX_JSON=$(echo "$MATRIX_JSON" | tr -d '\n' | tr -d ' ')
+          fi
+          
+          echo "Matrix content: $MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  build:
+    needs: generate-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    uses: ./.github/workflows/build.yml
+    with:
+      repo: ${{ matrix.repo }}
+      ksu_commit: ${{ inputs.ksu_commit }}
+      anykernel_commit: ${{ inputs.anykernel_commit }}
+      patches_commit: ${{ inputs.patches_commit }}
+      susfs_commit: ${{ inputs.susfs_commit }}
+      feature_set: ${{ inputs.feature_set }}
+    secrets: inherit

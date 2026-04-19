@@ -1,0 +1,25 @@
+name: Setup SUSFS Patches
+description: Clone and apply SUSFS patches with version-specific fixes
+inputs:
+  android_version:
+    description: 'Android version (e.g., android15)'
+    required: true
+  kernel_version:
+    description: 'Kernel version (e.g., 6.6)'
+    required: true
+  sublevel:
+    description: 'Kernel sublevel'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Apply Android 14 6.1 Fixes
+      if: inputs.android_version == 'android14' && inputs.kernel_version == '6.1'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/aosp
+      run: |
+        SUBLEVEL=${{ env.SUBLEVEL }}
+        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
+
+        echo "Not needed at the current time"

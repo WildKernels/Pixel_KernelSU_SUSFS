@@ -1,0 +1,36 @@
+name: 'Apply Kernel Branding'
+description: 'Apply Wild kernel branding to kernel version string'
+inputs:
+  build_type:
+    description: 'Build type (Normal, Bypass, MarionKernel, Hakan, etc.)'
+    required: true
+  kernel_version:
+    description: 'Kernel version (e.g., 5.10, 6.1, 6.6)'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Apply Kernel Name Branding
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/aosp
+      run: |
+        # Apply kernel branding based on version and variant
+        if [[ "${{ inputs.kernel_version }}" == "5."* ]] || [[ "${{ inputs.kernel_version }}" == "6.1" ]]; then
+          perl -i -0777 -pe 's/(.*)echo "\$res"/$1echo "\$res-Wild"/s' scripts/setlocalversion
+        else
+          perl -i -0777 -pe 's/(.*)echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"/$1echo "\${KERNELVERSION}\${file_localversion}\${config_localversion}\${LOCALVERSION}-Wild\${scm_version}"/s' scripts/setlocalversion
+        fi
+
+        : > .scmversion
+
+        echo "Getting last commit timestamp from kernel source..."
+
+        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        KERNEL_BUILD_DATE=$(date -u)
+
+        export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
+        echo "SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP" >> $GITHUB_ENV
+        
+        export KBUILD_BUILD_TIMESTAMP="$KERNEL_BUILD_DATE"
+        echo "KBUILD_BUILD_TIMESTAMP=$KERNEL_BUILD_DATE" >> $GITHUB_ENV

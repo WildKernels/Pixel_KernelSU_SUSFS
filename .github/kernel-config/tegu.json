@@ -1,0 +1,7 @@
+{
+  "include": [
+    {
+      "repo": "android-gs-tegu-6.1-android16"
+    }
+  ]
+}

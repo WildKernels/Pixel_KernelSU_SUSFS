@@ -1,0 +1,50 @@
+name: Setup TCP BBR v3
+description: configure TCP BBR v3
+inputs:
+  kernel_version:
+    description: 'Kernel version (e.g., 6.6)'
+    required: true
+  android_version:
+    description: 'Android version (e.g., 12)'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Extract BBG Version
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/aosp
+      run: |
+        cp "$GITHUB_WORKSPACE/kernel_patches/bbrv3-${inputs.android_version}-${inputs.kernel_version}.patch" $GITHUB_WORKSPACE/kernel/aosp
+        patch -p1 < "bbrv3-${inputs.android_version}-${inputs.kernel_version}.patch"
+
+    - name: Fix modules.bzl
+      shell: bash
+      if: false
+      working-directory: ${{ github.workspace }}/kernel/aosp
+      run: |
+        if [ "$inputs.kernel_version" == "6.1" ]; then
+          mods_file=modules.bzl
+          for m in "net/ipv4/tcp_bic.ko" "net/ipv4/tcp_htcp.ko" "net/ipv4/tcp_westwood.ko"; do
+            grep -q "'$m'" "$mods_file" && continue
+            sed -i "/_ARM64_GKI_MODULES_LIST = \[/,/^]/ s/^]/    \"$m\",\n]/" "$mods_file"
+          done
+        fi
+
+    - name: Add BBRv3 Config
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        CONFIG_TCP_CONG_ADVANCED=y
+        CONFIG_TCP_CONG_BBR=y
+        CONFIG_DEFAULT_BBR=y
+        CONFIG_DEFAULT_TCP_CONG="bbr"
+        CONFIG_NET_SCH_FQ=y
+        # CONFIG_TCP_CONG_BIC is not set
+        # CONFIG_TCP_CONG_WESTWOOD is not set
+        # CONFIG_TCP_CONG_HTCP is not set
+        EOF
+        
+
+    
