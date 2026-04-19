@@ -55,7 +55,7 @@ runs:
 
     - name: Enable KernelSU SUSFS Config
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel
+      working-directory: ${{ github.workspace }}
       run: |
         cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
         # KernelSU SUSFS Configuration

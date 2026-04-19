@@ -127,7 +127,7 @@ jobs:
         [[ -n "$EXTRACTED" ]] && SUBLEVEL="$EXTRACTED"
 
         KERNEL_VERSION="$VERSION.$PATCHLEVEL"
-        if KERNEL_VERSION == "6.1"; then
+        if [[ "$KERNEL_VERSION" == "6.1" ]]; then
           ANDROID_VERSION="android14"
         fi
 
