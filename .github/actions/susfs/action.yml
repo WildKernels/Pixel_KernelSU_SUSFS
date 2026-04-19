@@ -83,7 +83,7 @@ runs:
 
     - name: Apply KSU SUSFS Patches
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
+      working-directory: ${{ github.workspace }}/kernel/aosp/KernelSU-Next
       run: |
         cp ${{ github.workspace }}/kernel_patches/wild/ksun-0daf55582-susfs-v2.1.0-e259e7d6.patch ./
         patch -p1 < ksun-0daf55582-susfs-v2.1.0-e259e7d6.patch
