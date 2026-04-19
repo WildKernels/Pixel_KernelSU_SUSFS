@@ -2,20 +2,9 @@ name: 'Download Kernel Repository'
 description: 'Initialize and sync Android kernel source repository'
 
 inputs:
-  android_version:
-    description: 'Android version (e.g., android14)'
+  repo:
+    description: 'Kernel repository'
     required: true
-  kernel_version:
-    description: 'Kernel version (e.g., 5.15, 6.1)'
-    required: true
-  os_patch_level:
-    description: 'OS patch level (e.g., 2024-01)'
-    required: true
-
-outputs:
-  deprecated_branch:
-    description: 'Whether the branch is deprecated'
-    value: ${{ steps.sync.outputs.deprecated }}
 
 runs:
   using: composite
@@ -26,7 +15,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         # Initialize repo with the target branch
-        repo init -u https://android.googlesource.com/kernel/manifest -b aosp-${FORMATTED_BRANCH} --depth=1
+        repo init -u https://android.googlesource.com/kernel/manifest -b ${{inputs.repo }} --depth=1
         
         # Sync kernel source
         repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle

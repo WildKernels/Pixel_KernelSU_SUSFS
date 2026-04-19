@@ -127,8 +127,7 @@ jobs:
     - name: Download Kernel Repository
       uses: ./.github/actions/download-kernel
       with:
-        android_version: ${{ steps.parse.outputs.android_version }}
-        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        repo: "${{ inputs.repo }}"
 
     - name: Extract Sublevel and Set File Name
       id: extract
