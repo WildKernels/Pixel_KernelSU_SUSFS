@@ -1,7 +1,7 @@
 {
   "include": [
     {
-      "repo": "android-gs-akita-6.1-android16"
+      "repo": "android-gs-akita-android16"
     }
   ]
 }

@@ -35,26 +35,6 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v5
 
-    - name: Parse kernel version
-      id: parse
-      run: |
-        # Supports both legacy and repo-style input:
-        # - Repo:   android-gs-bluejay-6.1-android16
-        INPUT_VALUE="${{ inputs.repo }}"
-        CODENAME=""
-        IFS='-' read -r A G CODENAME KERNEL_VERSION ANDROID_VERSION <<< "$INPUT_VALUE"
-        echo "Parsed: CODE=$CODENAME, KERNEL=$KERNEL_VERSION, ANDROID=$ANDROID_VERSION"
-        
-        # Set environment variables for subsequent steps and shell scripts
-        echo "CODENAME=$CODENAME" >> "$GITHUB_ENV"
-        echo "ANDROID_VERSION=$ANDROID_VERSION" >> "$GITHUB_ENV"
-        echo "KERNEL_VERSION=$KERNEL_VERSION" >> "$GITHUB_ENV"
-
-        # Set step outputs for immediate YAML context access (avoids validation warnings)
-        echo "codename=$CODENAME" >> $GITHUB_OUTPUT
-        echo "android_version=$ANDROID_VERSION" >> $GITHUB_OUTPUT
-        echo "kernel_version=$KERNEL_VERSION" >> $GITHUB_OUTPUT
-
     - name: Free Disk Space
       if: true
       uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
@@ -129,23 +109,36 @@ jobs:
       with:
         repo: "${{ inputs.repo }}"
 
-    - name: Extract Sublevel and Set File Name
+    - name: Extract Kernel Version and Set File Name
       id: extract
       run: |
-        SUBLEVEL="$SUB_LEVEL"
-        if [[ -f "$GITHUB_WORKSPACE/kernel/aosp/Makefile" ]]; then
-          EXTRACTED=$(grep '^SUBLEVEL = ' "$GITHUB_WORKSPACE/kernel/aosp/Makefile" | awk '{print $3}')
-          [[ -n "$EXTRACTED" ]] && SUBLEVEL="$EXTRACTED"
+        KERNEL_DIR="$GITHUB_WORKSPACE/kernel/aosp"
+
+        # Extract VERSION
+        EXTRACTED=$(grep '^VERSION = ' "$KERNEL_DIR/Makefile" | awk '{print $3}')
+        [[ -n "$EXTRACTED" ]] && VERSION="$EXTRACTED"
+
+        # Extract PATCHLEVEL
+        EXTRACTED=$(grep '^PATCHLEVEL = ' "$KERNEL_DIR/Makefile" | awk '{print $3}')
+        [[ -n "$EXTRACTED" ]] && PATCHLEVEL="$EXTRACTED"
+
+        # Extract SUBLEVEL (your original)
+        EXTRACTED=$(grep '^SUBLEVEL = ' "$KERNEL_DIR/Makefile" | awk '{print $3}')
+        [[ -n "$EXTRACTED" ]] && SUBLEVEL="$EXTRACTED"
+
+        KERNEL_VERSION="$VERSION.$PATCHLEVEL"
+        if KERNEL_VERSION == "6.1"; then
+          ANDROID_VERSION="android14"
         fi
 
-        VARIANT="${{ matrix.variant }}"
-        FILE_NAME="$KERNEL_VERSION.$SUBLEVEL-$ANDROID_VERSION-$OS_PATCH_LEVEL-$VARIANT"
+        echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
+        echo "PATCHLEVEL=$PATCHLEVEL" >> $GITHUB_ENV
         echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
+        echo "ANDROID_VERSION=$ANDROID_VERSION" >> $GITHUB_ENV
+
+        FILE_NAME="$KERNEL_VERSION.$SUBLEVEL-$ANDROID_VERSION"
         echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
-        
-        # Set step outputs for parse-time YAML context access
-        echo "file_name=$FILE_NAME" >> $GITHUB_OUTPUT
-        echo "sublevel=$SUBLEVEL" >> $GITHUB_OUTPUT
+
 
     - name: Apply glibc 2.38 Compatibility Fix
       if: false
@@ -180,17 +173,17 @@ jobs:
       if: contains(inputs.feature_set, 'SUSFS')
       uses: ./.github/actions/susfs
       with:
-        android_version: ${{ steps.parse.outputs.android_version }}
-        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        android_version: ${{ env.ANDROID_VERSION }}
+        kernel_version: ${{ env.KERNEL_VERSION }}
         susfs_commit: ${{ inputs.susfs_commit }}
 
     - name: Setup SUSFS Patches
       if: contains(inputs.feature_set, 'SUSFS')
       uses: ./.github/actions/susfs-patches
       with:
-        android_version: ${{ steps.parse.outputs.android_version }}
-        kernel_version: ${{ steps.parse.outputs.kernel_version }}
-        sublevel: ${{ steps.extract.outputs.sublevel }}
+        android_version: ${{ env.ANDROID_VERSION }}
+        kernel_version: ${{ env.KERNEL_VERSION }}
+        sublevel: ${{ env.SUBLEVEL }}
 
     - name: Setup Baseband Guard
       if: contains(inputs.feature_set, 'BBG')
@@ -199,18 +192,17 @@ jobs:
     - name: Setup netfilter/ipset options
       uses: ./.github/actions/netfilter-ipset
       with:
-        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        kernel_version: ${{ env.KERNEL_VERSION }}
 
     - name: Setup BBRv3
       uses: ./.github/actions/bbr
       with:
-        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        kernel_version: ${{ env.KERNEL_VERSION }}
 
     - name: Apply Kernel Branding
       uses: ./.github/actions/apply-kernel-branding
       with:
-        build_type: ${{ matrix.variant }}
-        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        kernel_version: ${{ env.KERNEL_VERSION }}
 
     - name: Remove Protected Exports
       working-directory: ${{ github.workspace }}/kernel
@@ -319,7 +311,7 @@ jobs:
       if: false
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.extract.outputs.file_name }}-BootImages
+        name: ${{ env.FILE_NAME }}-BootImages
         path: ${{ github.workspace }}/boot-artifacts/*.img
         if-no-files-found: error
         compression-level: 0
@@ -364,7 +356,7 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.extract.outputs.file_name }}-AnyKernel3
+        name: ${{ env.FILE_NAME }}-AnyKernel3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
         compression-level: 9
@@ -373,7 +365,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.extract.outputs.file_name }}-Rejects
+        name: ${{ env.FILE_NAME }}-Rejects
         path: patch-rejects/
         if-no-files-found: ignore
         compression-level: 9
